@@ -71,8 +71,6 @@ RUN rm -rf ~/.bundle && rm -rf .bundle
 # Do not install development or test gems in production
 RUN if [ "$RAILS_ENV" = "production" ]; then \
   bundle config set without 'development test'; \
-  bundle config set deployment true; \
-  bundle config set frozen true; \
   bundle install -j 4 -r 3; \
   else bundle install -j 4 -r 3; \
   fi
