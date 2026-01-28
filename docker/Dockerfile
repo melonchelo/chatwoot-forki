@@ -73,12 +73,14 @@ RUN rm -rf ~/.bundle && rm -rf .bundle && \
 # Clear any git cache that might affect dependency resolution
 RUN rm -rf ~/.gitconfig && git config --global --unset-all safe.directory || true
 
+# Remove potentially corrupted Gemfile.lock and let bundler generate a fresh one
+RUN rm -f Gemfile.lock
+
 # Do not install development or test gems in production
 RUN if [ "$RAILS_ENV" = "production" ]; then \
   bundle config set without 'development test'; \
   bundle config set deployment false; \
   bundle config set clean true; \
-  bundle update --quiet; \
   bundle install -j 4 -r 3 --verbose; \
   else bundle install -j 4 -r 3; \
   fi
