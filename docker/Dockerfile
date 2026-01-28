@@ -66,12 +66,20 @@ RUN apk update && apk add --no-cache build-base musl ruby-full ruby-dev gcc make
 RUN bundle config set --local force_ruby_platform true
 
 # Clear any existing bundle cache and config
-RUN rm -rf ~/.bundle && rm -rf .bundle
+RUN rm -rf ~/.bundle && rm -rf .bundle && \
+    rm -rf /gems/ruby/*/cache && \
+    rm -rf vendor/bundle
+
+# Clear any git cache that might affect dependency resolution
+RUN rm -rf ~/.gitconfig && git config --global --unset-all safe.directory || true
 
 # Do not install development or test gems in production
 RUN if [ "$RAILS_ENV" = "production" ]; then \
   bundle config set without 'development test'; \
-  bundle install -j 4 -r 3; \
+  bundle config set deployment false; \
+  bundle config set clean true; \
+  bundle update --quiet; \
+  bundle install -j 4 -r 3 --verbose; \
   else bundle install -j 4 -r 3; \
   fi
 
