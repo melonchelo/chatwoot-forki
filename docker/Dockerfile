@@ -1,6 +1,6 @@
 # pre-build stage
 FROM node:24-alpine as node
-FROM ruby:3.4.4-alpine3.21 AS pre-builder
+FROM ruby:3.3.6-alpine3.20 AS pre-builder
 
 ARG NODE_VERSION="24.12.0"
 ARG PNPM_VERSION="10.2.0"
@@ -11,7 +11,7 @@ ENV PNPM_VERSION=${PNPM_VERSION}
 # For development docker-compose file overrides ARGS
 ARG BUNDLE_WITHOUT="development:test"
 ENV BUNDLE_WITHOUT ${BUNDLE_WITHOUT}
-ENV BUNDLER_VERSION=2.5.11
+ENV BUNDLER_VERSION=2.5.23
 
 ARG RAILS_SERVE_STATIC_FILES=true
 ENV RAILS_SERVE_STATIC_FILES ${RAILS_SERVE_STATIC_FILES}
@@ -35,7 +35,8 @@ RUN apk update && apk add --no-cache \
   curl \
   xz \
   && mkdir -p /var/app \
-  && gem install bundler
+  && gem uninstall bundler --all --force \
+  && gem install bundler:2.5.23
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
@@ -73,14 +74,16 @@ RUN rm -rf ~/.bundle && rm -rf .bundle && \
 # Clear any git cache that might affect dependency resolution
 RUN rm -rf ~/.gitconfig && git config --global --unset-all safe.directory || true
 
-# Remove potentially corrupted Gemfile.lock and let bundler generate a fresh one
-RUN rm -f Gemfile.lock
+# Configure bundle for better reliability
+RUN bundle config set --global path '/gems' \
+  && bundle config set --global bin '/gems/bin' \
+  && bundle config set --global force_ruby_platform true
 
 # Do not install development or test gems in production
 RUN if [ "$RAILS_ENV" = "production" ]; then \
-  bundle config set without 'development test'; \
-  bundle config set deployment false; \
-  bundle config set clean true; \
+  bundle config set --local without 'development test'; \
+  bundle config set --local deployment true; \
+  bundle config set --local clean true; \
   bundle install -j 4 -r 3 --verbose; \
   else bundle install -j 4 -r 3; \
   fi
@@ -104,13 +107,13 @@ RUN if [ "$RAILS_ENV" = "production" ]; then \
 RUN git rev-parse HEAD > /app/.git_sha
 
 # Remove unnecessary files
-RUN rm -rf /gems/ruby/3.4.0/cache/*.gem \
-  && find /gems/ruby/3.4.0/gems/ \( -name "*.c" -o -name "*.o" \) -delete \
+RUN rm -rf /gems/ruby/*/cache/*.gem \
+  && find /gems/ruby/*/gems/ \( -name "*.c" -o -name "*.o" \) -delete \
   && rm -rf .git \
   && rm .gitignore
 
 # final build stage
-FROM ruby:3.4.4-alpine3.21
+FROM ruby:3.3.6-alpine3.20
 
 ARG NODE_VERSION="24.12.0"
 ARG PNPM_VERSION="10.2.0"
@@ -119,7 +122,7 @@ ENV PNPM_VERSION=${PNPM_VERSION}
 
 ARG BUNDLE_WITHOUT="development:test"
 ENV BUNDLE_WITHOUT ${BUNDLE_WITHOUT}
-ENV BUNDLER_VERSION=2.5.11
+ENV BUNDLER_VERSION=2.5.23
 
 ARG EXECJS_RUNTIME="Disabled"
 ENV EXECJS_RUNTIME ${EXECJS_RUNTIME}
@@ -142,7 +145,8 @@ RUN apk update && apk add --no-cache \
   imagemagick \
   git \
   vips \
-  && gem install bundler
+  && gem uninstall bundler --all --force \
+  && gem install bundler:2.5.23
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
